@@ -1,0 +1,35 @@
+{
+	"groups": [
+		{
+			"keys": "description_json,green_png,yellow_png,blue_png,purple_png",
+			"name": "preload"
+		}
+	],
+	"resources": [
+		{
+			"name": "description_json",
+			"type": "json",
+			"url": "config/description.json"
+		},
+		{
+			"name": "green_png",
+			"type": "image",
+			"url": "assets/green.png"
+		},
+		{
+			"name": "yellow_png",
+			"type": "image",
+			"url": "assets/yellow.png"
+		},
+		{
+			"name": "blue_png",
+			"type": "image",
+			"url": "assets/blue.png"
+		},
+		{
+			"name": "purple_png",
+			"type": "image",
+			"url": "assets/purple.png"
+		}
+	]
+}
