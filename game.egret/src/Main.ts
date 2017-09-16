@@ -34,202 +34,625 @@ class Main extends egret.DisplayObjectContainer {
      * Process interface loading
      */
     private loadingView: LoadingUI;
+    private snake: Snake;
+    private otherSnakes: {};
+    private food: Food[];
+    private interval: number;
+    private moveEvent: egret.TouchEvent;
+    private timer: egret.Timer;
+    private radius = 10;
+    private foodnum = 233;
+    public SnakeLength = 50;
+    public foodadd = 10;
+    private socket: SocketIOClient.Socket;
+    private GetMoveTimer: egret.Timer;
+    private SnakeLineWidth = 4;
+    public BackGround: egret.Sprite;
+    private BackGroundWidth: number;
+    private BackGroundHeight: number;
+    private LittleMap: LittleMap;
+    private RankList: RankList;
+    private RankListWidth: number;
+    private RankListHeight: number;
+    private HitFlag: boolean;
 
     public constructor() {
         super();
-        this.addEventListener(egret.Event.ADDED_TO_STAGE, this.onAddToStage, this);
+        this.HitFlag = false;
+        this.interval = 100 ;
+        this.BackGroundWidth = 5000;
+        this.BackGroundHeight = 3000;
+        this.RankListWidth = 300;
+        this.RankListHeight = 400;
+        this.food = [];
+        this.otherSnakes = {};
+        this.addEventListener(egret.Event.ADDED_TO_STAGE, this.createGameScene, this);
     }
 
-    private onAddToStage(event: egret.Event) {
-
-        egret.lifecycle.addLifecycleListener((context) => {
-            // custom lifecycle plugin
-
-            context.onUpdate = () => {
-                console.log('hello,world')
-            }
-        })
-
-        egret.lifecycle.onPause = () => {
-            egret.ticker.pause();
-        }
-
-        egret.lifecycle.onResume = () => {
-            egret.ticker.resume();
-        }
-
-
-        //设置加载进度界面
-        //Config to load process interface
-        this.loadingView = new LoadingUI();
-        this.stage.addChild(this.loadingView);
-
-        //初始化Resource资源加载库
-        //initiate Resource loading library
-        RES.addEventListener(RES.ResourceEvent.CONFIG_COMPLETE, this.onConfigComplete, this);
-        RES.loadConfig("resource/default.res.json", "resource/");
+    private GiveSnake(snake: Snake) {
+        this.snake = snake;
     }
 
-    /**
-     * 配置文件加载完成,开始预加载preload资源组。
-     * configuration file loading is completed, start to pre-load the preload resource group
-     */
-    private onConfigComplete(event: RES.ResourceEvent): void {
-        RES.removeEventListener(RES.ResourceEvent.CONFIG_COMPLETE, this.onConfigComplete, this);
-        RES.addEventListener(RES.ResourceEvent.GROUP_COMPLETE, this.onResourceLoadComplete, this);
-        RES.addEventListener(RES.ResourceEvent.GROUP_LOAD_ERROR, this.onResourceLoadError, this);
-        RES.addEventListener(RES.ResourceEvent.GROUP_PROGRESS, this.onResourceProgress, this);
-        RES.addEventListener(RES.ResourceEvent.ITEM_LOAD_ERROR, this.onItemLoadError, this);
-        RES.loadGroup("preload");
+    private GiveStage() {
+        return this;
     }
-
-    /**
-     * preload资源组加载完成
-     * Preload resource group is loaded
-     */
-    private onResourceLoadComplete(event: RES.ResourceEvent) {
-        if (event.groupName == "preload") {
-            this.stage.removeChild(this.loadingView);
-            RES.removeEventListener(RES.ResourceEvent.GROUP_COMPLETE, this.onResourceLoadComplete, this);
-            RES.removeEventListener(RES.ResourceEvent.GROUP_LOAD_ERROR, this.onResourceLoadError, this);
-            RES.removeEventListener(RES.ResourceEvent.GROUP_PROGRESS, this.onResourceProgress, this);
-            RES.removeEventListener(RES.ResourceEvent.ITEM_LOAD_ERROR, this.onItemLoadError, this);
-            this.createGameScene();
-        }
-    }
-
-    /**
-     * 资源组加载出错
-     *  The resource group loading failed
-     */
-    private onItemLoadError(event: RES.ResourceEvent) {
-        console.warn("Url:" + event.resItem.url + " has failed to load");
-    }
-
-    /**
-     * 资源组加载出错
-     *  The resource group loading failed
-     */
-    private onResourceLoadError(event: RES.ResourceEvent) {
-        //TODO
-        console.warn("Group:" + event.groupName + " has failed to load");
-        //忽略加载失败的项目
-        //Ignore the loading failed projects
-        this.onResourceLoadComplete(event);
-    }
-
-    /**
-     * preload资源组加载进度
-     * Loading process of preload resource group
-     */
-    private onResourceProgress(event: RES.ResourceEvent) {
-        if (event.groupName == "preload") {
-            this.loadingView.setProgress(event.itemsLoaded, event.itemsTotal);
-        }
-    }
-
-    private textfield: egret.TextField;
-
     /**
      * 创建游戏场景
      * Create a game scene
      */
     private createGameScene() {
-        let sky = this.createBitmapByName("bg_jpg");
-        this.addChild(sky);
-        let stageW = this.stage.stageWidth;
-        let stageH = this.stage.stageHeight;
-        sky.width = stageW;
-        sky.height = stageH;
-
-        let topMask = new egret.Shape();
-        topMask.graphics.beginFill(0x000000, 0.5);
-        topMask.graphics.drawRect(0, 0, stageW, 172);
-        topMask.graphics.endFill();
-        topMask.y = 33;
-        this.addChild(topMask);
-
-        let icon = this.createBitmapByName("egret_icon_png");
-        this.addChild(icon);
-        icon.x = 26;
-        icon.y = 33;
-
-        let line = new egret.Shape();
-        line.graphics.lineStyle(2, 0xffffff);
-        line.graphics.moveTo(0, 0);
-        line.graphics.lineTo(0, 117);
-        line.graphics.endFill();
-        line.x = 172;
-        line.y = 61;
-        this.addChild(line);
+        this.stage.scaleMode = egret.StageScaleMode.FIXED_WIDTH;
+        this.BackGround = new egret.Sprite();
+        this.BackGround.width = this.BackGroundWidth;
+        this.BackGround.height = this.BackGroundHeight;
 
 
-        let colorLabel = new egret.TextField();
-        colorLabel.textColor = 0xffffff;
-        colorLabel.width = stageW - 172;
-        colorLabel.textAlign = "center";
-        colorLabel.text = "Hello Egret";
-        colorLabel.size = 24;
-        colorLabel.x = 172;
-        colorLabel.y = 80;
-        this.addChild(colorLabel);
+        this.socket = io('http://' + window.location.hostname + ':2222/');
+        let bg: egret.Shape = new egret.Shape();
+        bg.graphics.beginFill(0xf5f5f5);
+        bg.graphics.drawRect(0, 0, this.BackGround.width, this.BackGround.height);
+        bg.graphics.endFill();
+        this.BackGround.addChild(bg);
 
-        let textfield = new egret.TextField();
-        this.addChild(textfield);
-        textfield.alpha = 0;
-        textfield.width = stageW - 172;
-        textfield.textAlign = egret.HorizontalAlign.CENTER;
-        textfield.size = 24;
-        textfield.textColor = 0xffffff;
-        textfield.x = 172;
-        textfield.y = 135;
-        this.textfield = textfield;
 
-        //根据name关键字，异步获取一个json配置文件，name属性请参考resources/resource.json配置文件的内容。
-        // Get asynchronously a json configuration file according to name keyword. As for the property of name please refer to the configuration file of resources/resource.json.
-        RES.getResAsync("description_json", this.startAnimation, this)
-    }
+        // let snake = this.snake;
+        let stage = this;
 
-    /**
-     * 根据name关键字创建一个Bitmap对象。name属性请参考resources/resource.json配置文件的内容。
-     * Create a Bitmap object according to name keyword.As for the property of name please refer to the configuration file of resources/resource.json.
-     */
-    private createBitmapByName(name: string) {
-        let result = new egret.Bitmap();
-        let texture: egret.Texture = RES.getRes(name);
-        result.texture = texture;
-        return result;
-    }
+        this.socket.emit('join');
+        this.socket.on('create', function(NewSnake) {
+            var SnakeInfo = JSON.parse(NewSnake);
+            GiveSnakeToStage(SnakeInfo);
+            stage.BackGround.x = - (stage.snake.Head.x + stage.snake.x) + stage.stage.stageWidth/2;
+            stage.BackGround.y = - (stage.snake.Head.y + stage.snake.y) + stage.stage.stageHeight/2;
+            stage.addChild(stage.BackGround);
+            stage.LittleMap = new LittleMap(stage.BackGround.width, stage.BackGround.height, 5, 0.1);
+            stage.addChild(stage.LittleMap);
+            stage.LittleMap.anchorOffsetX = stage.LittleMap.width;
+            stage.LittleMap.x = stage.stage.stageWidth - 40;
+            stage.LittleMap.y = 10;
+            stage.setChildIndex(stage.LittleMap, -999);
+            stage.RankList = new RankList(stage.RankListWidth, stage.RankListHeight);
+            stage.addChild(stage.RankList);
+            stage.RankList.x = 10;
+            stage.RankList.y = 10;
+            stage.setChildIndex(stage.RankList, -999);
+            
+            
+        });
+        
+        
+        function GiveSnakeToStage(SnakeInfo) {
+            stage.snake = new Snake();
+            stage.snake.Create(SnakeInfo);
+            stage.BackGround.addChild(stage.snake);
+            stage.BackGround.setChildIndex(stage.snake, -999);
+        }
+        this.socket.on('other_join', function(data) {
+            let snake_info: any = JSON.parse(data);
+            let Osnake: Snake = new Snake();
+            Osnake.CreatOther(snake_info);
+            stage.otherSnakes[snake_info.id] = Osnake;
+            stage.BackGround.addChild(Osnake);
+            stage.BackGround.setChildIndex(Osnake,-999);      
+        });
 
-    /**
-     * 描述文件加载成功，开始播放动画
-     * Description file loading is successful, start to play the animation
-     */
-    private startAnimation(result: string[]) {
-        let parser = new egret.HtmlTextParser();
-
-        let textflowArr = result.map(text => parser.parse(text));
-        let textfield = this.textfield;
-        let count = -1;
-        let change = () => {
-            count++;
-            if (count >= textflowArr.length) {
-                count = 0;
+        this.socket.on('allfood', function(data) {
+            let food_info: Array<any> = JSON.parse(data);
+            food_info.forEach(food => {
+                let newFood: Food = new Food();
+                newFood.CreateFood(stage.radius, food.x, food.y, food.color, food.id, food.intake);
+                stage.BackGround.addChild(newFood);
+                stage.BackGround.setChildIndex(newFood, 1);
+                stage.food.push(newFood);
+            });
+        });
+        this.socket.on('other_eat', function(id, snake_id, colorcount) {
+            let food_info = stage.GetFoodByID(id);
+            if (food_info != null){
+                stage.otherSnakes[snake_id].ColorCount = JSON.parse(colorcount);
+                let ToX = stage.otherSnakes[snake_id].x + stage.otherSnakes[snake_id].Head.x;
+                let ToY = stage.otherSnakes[snake_id].y + stage.otherSnakes[snake_id].Head.y;
+                let animate = egret.Tween.get(food_info[1]);
+                animate.to({x: ToX, y: ToY}, 100);
+                egret.setTimeout(function () {
+                    stage.BackGround.removeChild(food_info[1]);
+                }, this, 100)
+                stage.food.splice(food_info[0], 1);
             }
-            let textFlow = textflowArr[count];
+        });
 
-            // 切换描述内容
-            // Switch to described content
-            textfield.textFlow = textFlow;
-            let tw = egret.Tween.get(textfield);
-            tw.to({ "alpha": 1 }, 200);
-            tw.wait(2000);
-            tw.to({ "alpha": 0 }, 200);
-            tw.call(change, this);
-        };
+        this.socket.on('other_snake', function(data) {
+            let snakes: Array<any> = JSON.parse(data);
+            snakes.forEach(snake => {
+                let Osnake: Snake = new Snake();
+                Osnake.CreatOther(snake);
+                stage.otherSnakes[snake.id] = Osnake;
+                stage.BackGround.addChild(Osnake);
+                stage.BackGround.setChildIndex(Osnake,-999);
+            });  
+        });
 
-        change();
+        this.socket.on('disconnect', function(id) {
+            if(stage.otherSnakes[id] !== undefined){
+                stage.otherSnakes[id].RemoveSnake();
+                stage.LittleMap.RemovePoint(id, 80);
+                var delay = setTimeout(function() {
+                    stage.BackGround.removeChild(stage.otherSnakes[id]);
+                    delete stage.otherSnakes[id];
+                }, 300);
+            }
+        });
+
+        this.socket.on('rebirth',function(id,newX,newY,newColorinfo,num,addpointinfo) {
+            console.log(id);
+            
+            let newColor = JSON.parse(newColorinfo);
+            let addpoint = JSON.parse(addpointinfo);
+            if(stage.snake.id === id){
+                for (var i = 0; i < stage.snake.BodyList.length; i++) {
+                    for (var j = 0 ; j < 3; j++) {
+                        let fromX = stage.snake.BodyList[i].x + stage.snake.x;
+                        let fromY = stage.snake.BodyList[i].y + stage.snake.y;
+                        var randomAngle = Math.random()*(Math.PI);
+                        var randomLength = Math.random()*70;
+                        let toX = fromX + randomLength*Math.cos(randomAngle);
+                        let toY = fromY + randomLength*Math.sin(randomAngle);
+                        let item = stage.CreateParticle(fromX, fromY, toX, toY, newX, newY);
+                    }
+                }
+                egret.Tween.removeTweens(stage.BackGround);
+                let animate = egret.Tween.get(stage.BackGround);
+                animate.to({
+                    x: - (newX) + stage.stage.stageWidth/2,
+                    y: - (newY) + stage.stage.stageHeight/2
+                }, 4000);
+                stage.snake.removeChildren();
+                if (num > 0) {
+                    let textTip = new RemoveTips();
+                    textTip.Create(num);
+                    textTip.textTips.width = stage.stage.stageWidth;
+                    textTip.anchorOffsetX = textTip.width/2;
+                    textTip.anchorOffsetY = textTip.height/2;
+                    textTip.x = stage.stage.stageWidth/2;
+                    textTip.y = stage.stage.stageHeight/2 - 200;
+                    stage.addChild(textTip);
+                    stage.setChildIndex(textTip, -999);
+                    setTimeout(function() {
+                        stage.removeChild(textTip);
+                    }, 100 * num + 2000);
+                }
+                //stage.BackGround.removeChild(stage.snake);
+                setTimeout(function(){
+                    stage.snake.ReDraw(newX,newY,newColor);
+                    stage.snake.AddPoint(addpoint);
+                    //stage.BackGround.addChild(stage.snake);
+                }, 4000);
+            }
+            else{
+                for (var i = 0; i < stage.otherSnakes[id].BodyList.length; i++) {
+                    for (var j = 0 ; j < 3; j++) {
+                        let fromX = stage.otherSnakes[id].BodyList[i].x + stage.otherSnakes[id].x;
+                        let fromY = stage.otherSnakes[id].BodyList[i].y + stage.otherSnakes[id].y;
+                        var randomAngle = Math.random()*(Math.PI);
+                        var randomLength = Math.random()*70;
+                        let toX = fromX + randomLength*Math.cos(randomAngle);
+                        let toY = fromY + randomLength*Math.sin(randomAngle);
+                        let item = stage.CreateParticle(fromX, fromY, toX, toY, newX, newY);
+                    }
+                }
+                let OtherSnakeRebirth = stage.otherSnakes[id];
+                stage.otherSnakes[id].removeChildren();
+                //stage.BackGround.removeChild(stage.otherSnakes[id]);
+                // delete stage.otherSnakes[id];
+                setTimeout(function(){
+                    // stage.otherSnakes[id] = OtherSnakeRebirth;
+                    stage.otherSnakes[id].ReDraw(newX,newY,newColor);
+                    stage.otherSnakes[id].AddPoint(addpoint);
+                    //stage.BackGround.addChild(stage.otherSnakes[id]);
+                }, 4000);
+            }
+                
+        });
+
+        this.socket.on('AnimateAddFood', function(data, islocal, id, bodyid) {
+            let addfood: Array<any> = JSON.parse(data);
+            if (islocal === "true") {
+                stage.DropBodyPoint(bodyid, stage.snake);   
+            }
+            else {
+                let findsnake = stage.otherSnakes[id];
+                if(findsnake !== undefined){
+                    stage.DropBodyPoint(bodyid, findsnake);
+                }
+            }
+            addfood.forEach(food => {
+                if (!(food.x <= 0 || food.y <= 0 || food.x >= stage.BackGround.width || food.y >= stage.BackGround.height))
+                stage.BodytoFood(food.fromX, food.fromY, food.x, food.y, food.intake, food.color, food.id);
+            });
+        });
+
+        this.socket.on('move', function(data) {
+            let snake_info: any = JSON.parse(data);
+            let findsnake = stage.otherSnakes[snake_info.id];
+            if(findsnake !== undefined){
+                findsnake.OtherMove(snake_info, 80);
+                let info = {
+                    x: snake_info.body[0].x + findsnake.x,
+                    y: snake_info.body[0].y + findsnake.y,
+                    id: snake_info.id,
+                    mine: false,
+                }
+                stage.LittleMap.addSnakeOrModify(info, 80);
+            }
+        });
+
+        this.socket.on('own_add_point', function(data, food_id) {
+            var color_info = JSON.parse(data);
+            stage.snake.AfterEat(color_info, food_id);
+        });
+
+        this.socket.on('other_add_point', function(id, data, food_id) {
+            var color_info = JSON.parse(data)
+            let findsnake = stage.otherSnakes[id];
+            if (findsnake !== undefined) {
+                findsnake.AfterEat(color_info, food_id);
+            }
+        });
+
+        this.socket.on('add_food_for_num', function(data){
+            let infos = JSON.parse(data);
+            infos.forEach(food => {
+                let newFood: Food = new Food();
+                newFood.CreateFood(stage.radius, food.x, food.y, food.color, food.id, food.intake);
+                stage.BackGround.addChild(newFood);
+                stage.BackGround.setChildIndex(newFood, 1);
+                stage.food.push(newFood);
+            });
+        });
+
+
+        this.GetMoveTimer = new egret.Timer(80);
+        this.GetMoveTimer.addEventListener(egret.TimerEvent.TIMER, this.GetOtherMove, this);
+        this.GetMoveTimer.start();
+
+        mouse.enable(this.stage);
+        mouse.setMouseMoveEnabled(true);
+        this.BackGround.touchEnabled = true;
+
+        this.BackGround.addEventListener(mouse.MouseEvent.MOUSE_MOVE, this.OnMove, this);
+        this.BackGround.addEventListener(egret.TouchEvent.TOUCH_BEGIN,this.startTouchAccelerate, this);
+        this.BackGround.addEventListener(egret.TouchEvent.TOUCH_END, this.endTouchAccelerate, this);
     }
+    private GetOtherMove() {
+        let move_info: Array<Object> = [];
+        if (this.snake !== undefined){
+            for (var i = 0; i < this.snake.BodyList.length; i++) {
+                let single_object;
+                let getcolor = new Color();
+                single_object = {
+                    id: this.snake.BodyList[i].id,
+                    x: this.snake.BodyList[i].x,
+                    y: this.snake.BodyList[i].y,
+                    color: getcolor.OriginColor.indexOf(this.snake.BodyList[i].Color.Origin)
+                }
+                move_info.push(single_object);
+            }
+            this.socket.emit('move',JSON.stringify(move_info), this.snake.id);
+            let info = {
+                id: this.snake.id,
+                x: this.snake.BodyList[0].x + this.snake.x,
+                y: this.snake.BodyList[0].y + this.snake.y,
+                mine: true
+            }
+            
+            this.LittleMap.addSnakeOrModify(info, 80);
+            let score = 0;
+            for (var key in this.snake.ColorCount) {
+                score += this.snake.ColorCount[key];
+            }
+            let RankInfo= [
+                {
+                    playercode: this.snake.playercode,
+                    length: this.snake.BodyList.length * 15 + score,
+                    mine: true
+                }
+            ];
+            for (var key in this.otherSnakes) {
+                score = 0;
+                let colorcount = this.otherSnakes[key].ColorCount;
+                
+                for (var other_key in colorcount) {
+                    score += colorcount[other_key];
+                }
+                let singleInfo ;
+                singleInfo = {
+                    playercode: this.otherSnakes[key].playercode,
+                    length: this.otherSnakes[key].BodyList.length * 15 + score,
+                    mine: false
+                };
+                RankInfo.push(singleInfo);
+            }
+            this.RankList.Manager(RankInfo);
+        }
+    }
+
+    private OnMove(e: egret.TouchEvent) {
+        
+        if (this.snake !== undefined){
+            this.moveEvent = e;
+            if (this.timer == null){
+                this.timer = new egret.Timer(this.interval);
+                if (!this.timer.hasEventListener(egret.TimerEvent.TIMER)){
+                    this.timer.addEventListener(egret.TimerEvent.TIMER, this.onTimer, this);
+                }
+                this.timer.start();
+            }
+            if (this.snake.BodyList.length <= 2) {
+                this.endTouchAccelerate();
+            }
+        }
+    }
+
+    private onEatFood(i) {
+        let ncolor = this.food[i].color;
+        let foodRemove = this.food[i];
+        let animate = egret.Tween.get(this.food[i]);
+        animate.to({
+            x: this.snake.x + this.snake.Head.x,
+            y: this.snake.y + this.snake.Head.y
+        }, 100);
+        egret.setTimeout(function() {
+             this.BackGround.removeChild(foodRemove);
+        }, this, 100);
+        let removeid: string;
+        removeid = this.food[i].id;
+        if(this.snake.ColorCount[ncolor.Origin]) {
+            this.snake.ColorCount[ncolor.Origin] += this.food[i].intake;
+        }
+        else {
+            this.snake.ColorCount[ncolor.Origin] = this.food[i].intake;
+        }
+        if(this.snake.ColorCount[ncolor.Origin] >= 15) {
+            var color_info = {
+                Ocolor: this.food[i].color.Origin,
+                Bcolor: this.food[i].color.Bright
+            }
+            this.socket.emit("afterEat",this.snake.id, JSON.stringify(color_info));
+            this.snake.ColorCount[ncolor.Origin] -= 15;
+        }
+        this.food.splice(i,1);
+        this.socket.emit('eatfood',removeid, JSON.stringify(this.snake.ColorCount));
+    }
+
+    private onTimer() {
+        if (this.snake.BodyList.length <= 2) {
+            this.snake.bool = false;
+            this.HitFlag = true;
+        }
+        else if (this.HitFlag === true) {
+            this.snake.bool = true;
+            this.HitFlag = false;
+        }
+        for(var i = 0;i < this.food.length;i++) {
+            if(this.hit(this.snake.Head, this.food[i])) {
+                this.onEatFood(i);
+                break;
+            }
+        }
+        let headX = this.snake.Head.x;
+        let headY = this.snake.Head.y;
+        let BGX = this.BackGround.x;
+        let BGY = this.BackGround.y;
+        let target = this.snake.Move(this.moveEvent, BGX, BGY, this.BackGroundWidth, this.BackGroundHeight, this.interval);
+        
+        if (target !== null) {
+            let animateBG = egret.Tween.get(this.BackGround);
+            animateBG.to({
+                x: this.BackGround.x - (target.x - headX),
+                y: this.BackGround.y - (target.y - headY)
+            }, this.interval);
+        }
+
+        //蛇碰撞
+        if (this.snake.bool === true){
+            for(var key in this.otherSnakes) {
+                let flag = 0;
+                let PassiveSnake: Snake;
+                PassiveSnake = this.otherSnakes[key];
+                for(var j = 0; j < PassiveSnake.BodyList.length; j++) {
+                    
+                    let head = this.snake.Head;
+                    let HitCheck;
+                    HitCheck = new Object();
+                    HitCheck = this.snakeHeadCheck(head, PassiveSnake, j);
+                    if(HitCheck){
+                        this.snake.bool = false;
+                        this.socket.emit('rebirth',this.snake.id,this.snake.BodyList.length,0);
+                        flag = 1;
+                        break;
+                    }
+                }
+                if(flag === 1) break;
+            }
+        }
+    }
+
+    private CreateParticle(fromX: number, fromY: number, toX: number, toY: number, flytoX: number, flytoY: number): egret.Shape {
+        let particle =  new Particle();
+        particle.CreateParticle(fromX, fromY, toX, toY, flytoX, flytoY);
+        this.BackGround.addChild(particle);
+        let stage = this;
+        setTimeout(function() {
+            stage.BackGround.removeChild(particle);
+        }, 4000);
+        return particle;
+    }
+
+    /**
+     * 蛇碰撞食物
+     */
+    private hit(a, b) {
+        if ((a.x + this.snake.x - b.x)*(a.x + this.snake.x - b.x) + (a.y + this.snake.y - b.y)*(a.y + this.snake.y - b.y) < 10 * this.radius * this.radius){
+            return true;
+        }
+        else {
+            return false;
+        }
+        // return (new egret.Rectangle(a.x + this.snake.x - this.radius, a.y + this.snake.y - this.radius, a.width, a.height))
+        //     .intersects(new egret.Rectangle(b.x,b.y,b.width,b.height));
+    }
+
+    private snakeHeadCheck(head, PassiveSnake: Snake, j:number) {
+        let rsquare = 4 * (this.radius) * (this.radius);
+        let Mdx = (head.x + this.snake.x - PassiveSnake.BodyList[j].x - PassiveSnake.x);
+        let Mdy = (head.y + this.snake.y - PassiveSnake.BodyList[j].y - PassiveSnake.y);
+        let Mdist = Mdx*Mdx + Mdy*Mdy;
+        if(Mdist <= rsquare && this.snake.bool) {
+            return true;
+        }
+        else return false;
+    }
+
+    private startTouchAccelerate() {
+        if (this.snake !== undefined){
+            if(this.snake.BodyList.length > 2){
+                this.timer.delay = 50;
+                this.interval = 50;
+                this.startAccelerate();
+            }
+        }
+    }
+
+    private endTouchAccelerate() {
+        if (this.snake !== undefined){
+            this.timer.delay = 100;
+            this.interval = 100;
+            this.stopAccelerate();
+        }
+    }
+
+    private IfDropBody() {
+        this.snake.count++;
+        if(this.snake.BodyList.length <= 2) {
+            // if (this.snake.AccelerateTimer !== null){
+            //     this.snake.AccelerateTimer.stop();
+            //     this.snake.AccelerateTimer.removeEventListener(egret.TimerEvent.TIMER, this.IfDropBody, this);
+            // }
+            this.endTouchAccelerate();
+        }
+        if(this.snake.BodyList.length > 2 && this.snake.count%100 === 0) {
+            var last_body = this.snake.BodyList[this.snake.BodyList.length - 1];
+            
+            var drop_body = {
+                id: last_body.id,
+                x: last_body.x + this.snake.x,
+                y: last_body.y + this.snake.y,
+                color: last_body.Color.OriginColor.indexOf(last_body.Color.Origin)
+            }
+            this.socket.emit('Drop', JSON.stringify(drop_body));
+            this.snake.count = 0;
+        }
+    }
+
+    private startAccelerate() {
+        if (this.snake.AccelerateTimer === undefined){
+            this.snake.AccelerateTimer = new egret.Timer(30);
+        }
+        this.snake.AccelerateTimer.addEventListener(egret.TimerEvent.TIMER, this.IfDropBody, this);
+		this.snake.AccelerateTimer.start();
+	}
+
+    private stopAccelerate() {
+        if(this.snake.AccelerateTimer !== null) {
+            if(this.snake.AccelerateTimer.hasEventListener(egret.TimerEvent.TIMER)){
+                this.snake.AccelerateTimer.stop();
+                this.snake.AccelerateTimer.removeEventListener(egret.TimerEvent.TIMER, this.IfDropBody, this);
+            }
+        }
+	}
+    
+
+    private BodytoFood(fromX: number, fromY: number, x: number, y: number, intake: number, color: number, foodid: string) {
+		let food: Food;
+        food = new Food();
+        food.CreateFood(this.radius, fromX, fromY, color, foodid, intake);		
+        this.BackGround.addChild(food);
+        this.BackGround.setChildIndex(food,1);
+        this.food.push(food);
+        var animate: egret.Tween = egret.Tween.get(food);
+        animate.to({
+            x: x, 
+            y: y
+        }, 500, egret.Ease.circOut);
+	}
+
+    private GetFoodByID(id :string): Array<any> {
+        for (var i = 0; i < this.food.length; i++) {
+            if (this.food[i].id === id) {
+                var info = [];
+                info[0] = i;
+                info[1] = this.food[i];
+                return info;
+            }
+        }
+        return null;
+    }
+
+    private DropBodyPoint(bodyid: string, snake: Snake) {
+        let last_body;
+        for (var i = snake.BodyList.length - 1; i >= 0; i--) {
+            if (snake.BodyList[i].id === bodyid) {
+                last_body = snake.BodyList[i];
+                let last_body_color = snake.BodyList[i].Color;
+                let last_body_x = snake.BodyList[i].x;
+                let last_body_y = snake.BodyList[i].y;
+                snake.removeChild(last_body);
+                snake.BodyList.splice(i, 1);
+                let falsebodypoint = new BodyPoint();
+                falsebodypoint.Create(this.radius, last_body_color, false);
+                falsebodypoint.x = snake.x + last_body_x;
+                falsebodypoint.y = snake.y + last_body_y;
+                this.BackGround.addChild(falsebodypoint);
+                this.BackGround.setChildIndex(falsebodypoint, -999);
+                var animate: egret.Tween = egret.Tween.get(falsebodypoint);
+                animate.to({scaleX: 0.01, scaleY: 0.01,alaph: 0}, 500, egret.Ease.circOut);
+                let stage = this;
+                setTimeout(function() {
+                    stage.BackGround.removeChild(falsebodypoint);
+                }, 500);
+                break;
+            }
+        }
+        
+        return null;
+    }
+
+    private Rebirth(DieSnake: Snake) {  //写在判断执行后    
+        this.removeChild(this.snake);
+        this.snake.removeChildren();
+        //this.socket.emit('rebirth',this.snake.id,this.snake.BodyList.length);
+    }
+
+    private ReDraw(id,x,y,newColor) {
+        this.snake.ReDraw(x,y,newColor);
+        this.addChild(this.snake);
+        let move_info: Array<Object> = [];
+            for (var i = 0; i < this.snake.BodyList.length; i++) {
+                let single_object;
+                let getcolor = new Color();
+                single_object = {
+                    id: this.snake.BodyList[i].id,
+                    x: this.snake.BodyList[i].x,
+                    y: this.snake.BodyList[i].y,
+                    color: getcolor.OriginColor.indexOf(this.snake.BodyList[i].Color.Origin)
+                }
+                move_info.push(single_object);
+            }
+        // this.socket.emit('new_a_die',JSON.stringify());
+            
+        
+        
+    }
+    
+    
 }
-
-
