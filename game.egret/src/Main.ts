@@ -373,6 +373,7 @@ class Main extends egret.DisplayObjectContainer {
                 RankInfo.push(singleInfo);
             }
             this.RankList.Manager(RankInfo);
+            this.socket.emit('score', RankInfo[0].length);
         }
     }
 
