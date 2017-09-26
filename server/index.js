@@ -5,7 +5,7 @@ var io = require('socket.io')(http, {
   pingInterval: 100,
 });
 var uuid = require('node-uuid');
-var mysql = require('mysql');
+var mysql = require('mysql'); //运行 npm install mysql --save 安装数据库依赖
 var connection = mysql.createConnection({
   host : 'localhost',
   user : 'root',
